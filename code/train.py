@@ -13,8 +13,10 @@ from torch.optim import SGD, Optimizer
 from torch.optim.lr_scheduler import StepLR
 import time
 import datetime
+from gen_gauss_utils import randgn_like
 from train_utils import AverageMeter, accuracy, init_logfile, log
-
+import torch.backends.cudnn as cudnn
+from torchvision import transforms, datasets
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('dataset', type=str, choices=DATASETS)
 parser.add_argument('arch', type=str, choices=ARCHITECTURES)
@@ -36,13 +38,16 @@ parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
 parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
                     metavar='W', help='weight decay (default: 1e-4)')
 parser.add_argument('--noise_sd', default=0.0, type=float,
-                    help="standard deviation of Gaussian noise for data augmentation")
+                    help="standard deviation of noise for data augmentation")
+parser.add_argument('--p', default=2, type=int, help="p-norm for generalized Gaussian noise")
+parser.add_argument('--scale_down',default=1, type=int, help="factor to scale each dimension down by")
 parser.add_argument('--gpu', default=None, type=str,
                     help='id(s) for CUDA_VISIBLE_DEVICES')
 parser.add_argument('--print-freq', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 args = parser.parse_args()
 
+cudnn.benchmark = True
 
 def main():
     if args.gpu:
@@ -50,26 +55,37 @@ def main():
 
     if not os.path.exists(args.outdir):
         os.mkdir(args.outdir)
-
-    train_dataset = get_dataset(args.dataset, 'train')
-    test_dataset = get_dataset(args.dataset, 'test')
+    if (args.scale_down == 1 or args.dataset == "imagenet"):
+        train_dataset = get_dataset(args.dataset, 'train')
+        test_dataset = get_dataset(args.dataset, 'test')
+    else:
+        train_dataset = datasets.CIFAR10("./dataset_cache", train=True, download=True, transform=transforms.Compose([
+            transforms.Resize(int(32/args.scale_down)),
+            transforms.RandomCrop(int(32/args.scale_down), padding=int(4/args.scale_down)),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor()
+        ]))
+        test_dataset = datasets.CIFAR10("./dataset_cache", train=False, download=True, transform=transforms.Compose([
+            transforms.Resize(int(32/args.scale_down)),
+            transforms.ToTensor()
+        ]))
     pin_memory = (args.dataset == "imagenet")
     train_loader = DataLoader(train_dataset, shuffle=True, batch_size=args.batch,
                               num_workers=args.workers, pin_memory=pin_memory)
     test_loader = DataLoader(test_dataset, shuffle=False, batch_size=args.batch,
                              num_workers=args.workers, pin_memory=pin_memory)
 
-    model = get_architecture(args.arch, args.dataset)
 
+    model = get_architecture(args.arch, args.dataset)
+    #model = torch.nn.DataParallel(model)
     logfilename = os.path.join(args.outdir, 'log.txt')
     init_logfile(logfilename, "epoch\ttime\tlr\ttrain loss\ttrain acc\ttestloss\ttest acc")
 
-    criterion = CrossEntropyLoss().cuda()
+    criterion = CrossEntropyLoss()
     optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
 
     for epoch in range(args.epochs):
-        scheduler.step(epoch)
         before = time.time()
         train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, args.noise_sd)
         test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd)
@@ -78,6 +94,7 @@ def main():
         log(logfilename, "{}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}".format(
             epoch, str(datetime.timedelta(seconds=(after - before))),
             scheduler.get_lr()[0], train_loss, train_acc, test_loss, test_acc))
+        scheduler.step(epoch)
 
         torch.save({
             'epoch': epoch + 1,
@@ -106,8 +123,9 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
         targets = targets.cuda()
 
         # augment inputs with noise
-        inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd
-
+        inputs = inputs + randgn_like(inputs, p=args.p, device='cuda') * noise_sd
+        if (args.scale_down != 1):
+            inputs = torch.nn.functional.interpolate(inputs, scale_factor=args.scale_down)
         # compute output
         outputs = model(inputs)
         loss = criterion(outputs, targets)
@@ -160,9 +178,11 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float)
             targets = targets.cuda()
 
             # augment inputs with noise
-            inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd
+            inputs = inputs + randgn_like(inputs, p=args.p,  device='cuda') * noise_sd
 
             # compute output
+            if (args.scale_down != 1):
+                inputs = torch.nn.functional.interpolate(inputs, scale_factor=args.scale_down)
             outputs = model(inputs)
             loss = criterion(outputs, targets)
 

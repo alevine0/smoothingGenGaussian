@@ -1,7 +1,8 @@
 import torch
 from scipy.stats import norm, binom_test
 import numpy as np
-from math import ceil
+import gen_gauss_utils
+from math import ceil, sqrt, log, pow
 from statsmodels.stats.proportion import proportion_confint
 
 
@@ -11,7 +12,7 @@ class Smooth(object):
     # to abstain, Smooth returns this int
     ABSTAIN = -1
 
-    def __init__(self, base_classifier: torch.nn.Module, num_classes: int, sigma: float):
+    def __init__(self, base_classifier: torch.nn.Module, num_classes: int, sigma: float, p=2.):
         """
         :param base_classifier: maps from [batch x channel x height x width] to [batch x num_classes]
         :param num_classes:
@@ -20,6 +21,7 @@ class Smooth(object):
         self.base_classifier = base_classifier
         self.num_classes = num_classes
         self.sigma = sigma
+        self.p = p
 
     def certify(self, x: torch.tensor, n0: int, n: int, alpha: float, batch_size: int) -> (int, float):
         """ Monte Carlo algorithm for certifying that g's prediction around x is constant within some L2 radius.
@@ -50,6 +52,38 @@ class Smooth(object):
             radius = self.sigma * norm.ppf(pABar)
             return cAHat, radius
 
+    def upper_bound_certify_generalized(self, x: torch.tensor, n0: int, n: int, alpha: float, batch_size: int) -> (int, int, float, float,float):
+        """ Monte Carlo algorithm for certifying that g's prediction around x is constant within some L2 radius.
+        With probability at least 1 - alpha, the class returned by this method will equal g(x), and g's prediction will
+        robust within a L2 ball of radius R around x.
+
+        :param x: the input [channel x height x width]
+        :param n0: the number of Monte Carlo samples to use for selection
+        :param n: the number of Monte Carlo samples to use for estimation
+        :param alpha: the failure probability
+        :param batch_size: batch size to use when evaluating the base classifier
+        :return: (predicted class, certified radius)
+                 in the case of abstention, the class will be ABSTAIN and the radius 0.
+        """
+        #self.base_classifier.eval()
+        # draw samples of f(x+ epsilon)
+        counts_selection = self._sample_gen_gaussian_noise(x, n0, batch_size)
+        # use these samples to take a guess at the top class
+        cAHat = counts_selection.argmax().item()
+        # draw more samples of f(x + epsilon)
+        counts_estimation = self._sample_gen_gaussian_noise(x, n, batch_size)
+        # use these samples to estimate a lower bound on pA
+        nA = counts_estimation[cAHat].item()
+        pABar = self._lower_confidence_bound(nA, n, alpha)
+        d = x.numel()
+        if pABar < 0.5:
+            return Smooth.ABSTAIN, nA, 0.0, 0.0,0.0
+        else:
+            radius_any_distr = self.sigma/(sqrt(2*(1.-pABar))*pow(d,.5-(1./self.p)))
+            radius_gen_gauss = self.sigma*2*sqrt(log(1./(1.-pABar)))/(pow(d,.5-(1./self.p)))
+            radius_ppf = self.sigma * norm.ppf(pABar)
+            return cAHat, nA, radius_any_distr, radius_gen_gauss,radius_ppf
+
     def predict(self, x: torch.tensor, n: int, alpha: float, batch_size: int) -> int:
         """ Monte Carlo algorithm for evaluating the prediction of g at x.  With probability at least 1 - alpha, the
         class returned by this method will equal g(x).
@@ -72,6 +106,27 @@ class Smooth(object):
             return Smooth.ABSTAIN
         else:
             return top2[0]
+
+    def _sample_gen_gaussian_noise(self, x: torch.tensor, num: int, batch_size) -> np.ndarray:
+        """ Sample the base classifier's prediction under noisy corruptions of the input x.
+
+        :param x: the input [channel x width x height]
+        :param num: number of samples to collect
+        :param batch_size:
+        :return: an ndarray[int] of length num_classes containing the per-class counts
+        """
+        with torch.no_grad():
+            counts = np.zeros(self.num_classes, dtype=int)
+            for _ in range(ceil(num / batch_size)):
+                this_batch_size = min(batch_size, num)
+                num -= this_batch_size
+
+                batch = x.repeat((this_batch_size, 1, 1, 1))
+                noise = gen_gauss_utils.randgn_like(batch, device='cuda',p=self.p) * self.sigma
+                predictions = self.base_classifier(batch + noise).argmax(1)
+                counts += self._count_arr(predictions.cpu().numpy(), self.num_classes)
+            return counts
+
 
     def _sample_noise(self, x: torch.tensor, num: int, batch_size) -> np.ndarray:
         """ Sample the base classifier's prediction under noisy corruptions of the input x.

@@ -2,3 +2,6 @@
 *~
 models
 .DS_Store
+._*
+nohup*
+dataset_cache
