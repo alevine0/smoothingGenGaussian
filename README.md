@@ -1,6 +1,6 @@
 # Curse of Dimensionality on Randomized Smoothing for Certifiable Robustness
 
-This repository contains code for the paper "Curse of Dimensionality on Randomized Smoothing for Certifiable Robustness" by Anonymous Authors. The code is forked from the publically-availabe code from the paper [Certified Adversarial Robustness via Randomized Smoothing](https://arxiv.org/abs/1902.02918) by (Cohen et al. 2019).
+This repository contains code for the paper [Curse of Dimensionality on Randomized Smoothing for Certifiable Robustness](https://arxiv.org/abs/2002.03239) by Aounon Kumar, Alexander Levine, Tom Goldstein, and Soheil Feizi. The code is forked from the publicly-available code from the paper [Certified Adversarial Robustness via Randomized Smoothing](https://arxiv.org/abs/1902.02918) by (Cohen et al. 2019).
 
 Example training for 16-by-16 cifar-10 with generalized Gaussian noise for shape parameter q=3 and noise standard deviation 0.5:
 ```
