@@ -20,13 +20,13 @@ for scale in ["16","8"]:
 	for noise in ["0.12","0.25","0.50","1.00"]:
 		for p in [1,2,3,4,5,6]:
 			csv = pandas.read_csv('data/certify/cifar10/resnet110/noise_'+noise+'_p_'+str(p)+'_scale_'+scale+'/test/sigma_'+noise+'_p_'+str(p)+'_scale_'+scale,delimiter='\t')
-			medgg = np.median(csv['generalized_gaussian_bound_over_sqrt(c)'].to_numpy()*csv['correct'].to_numpy())
+			medgg = np.median(csv['generalized_gaussian_bound_over_c'].to_numpy()*csv['correct'].to_numpy())
 			mediid = np.median(csv['any_iid_distribution_bound'].to_numpy()*csv['correct'].to_numpy())
 			medcount = np.median(csv['count'].to_numpy()*csv['correct'].to_numpy())
 			print('Median Count: '+scale+'*'+scale+', p:' + str(p) + ' noise:' + noise+ ' ===== ' + str(medcount))
-			print('p_1 lower bound: '+scale+'*'+scale+', p:' + str(p) + ' noise:' + noise+ ' ===== ' + str(f(medcount)))
+			print('p_1 count: '+scale+'*'+scale+', p:' + str(p) + ' noise:' + noise+ ' ===== ' + str(f(medcount)))
 			print('IID bound size: '+scale+'*'+scale+', p:' + str(p) + ' noise:' + noise+ ' ===== ' + str(mediid))
-			print('GG bound size: '+scale+'*'+scale+', p:' + str(p) + ' noise:' + noise+ ' ===== ' + str(medgg))
+			print('GG bound size (over c): '+scale+'*'+scale+', p:' + str(p) + ' noise:' + noise+ ' ===== ' + str(medgg))
 			if (p == 2):
 				medgaus = np.median(csv['exact_radius'].to_numpy()*csv['correct'].to_numpy())
 				print('Gaussian bound: '+scale+'*'+scale+', p:' + str(p) + ' noise:' + noise+ ' ===== ' + str(medgaus))

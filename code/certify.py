@@ -43,9 +43,9 @@ if __name__ == "__main__":
     # prepare output file
     f = open(args.outfile, 'w')
     if (args.p == 2):
-        print("idx\tlabel\tpredict\tcount\tany_iid_distribution_bound\tgeneralized_gaussian_bound_over_sqrt(c)\texact_radius\tcorrect\ttime", file=f, flush=True)
+        print("idx\tlabel\tpredict\tcount\tany_iid_distribution_bound\tgeneralized_gaussian_bound_over_c\texact_radius\tcorrect\ttime", file=f, flush=True)
     else:
-        print("idx\tlabel\tpredict\tcount\tany_iid_distribution_bound\tgeneralized_gaussian_bound_over_sqrt(c)\tcorrect\ttime", file=f, flush=True)
+        print("idx\tlabel\tpredict\tcount\tany_iid_distribution_bound\tgeneralized_gaussian_bound_over_c\tcorrect\ttime", file=f, flush=True)
 
     # iterate through the dataset
     if (args.scale_down == 1 or args.dataset == "imagenet"):
@@ -68,16 +68,16 @@ if __name__ == "__main__":
         before_time = time()
         # certify the prediction of g around x
         x = x.cuda()
-        prediction, count, radius_gen, radius_over_sqrt_c, radius_ppf  = smoothed_classifier.upper_bound_certify_generalized(x, args.N0, args.N, args.alpha, args.batch)
+        prediction, count, radius_gen, radius_over_c, radius_ppf  = smoothed_classifier.upper_bound_certify_generalized(x, args.N0, args.N, args.alpha, args.batch)
         after_time = time()
         correct = int(prediction == label)
 
         time_elapsed = str(datetime.timedelta(seconds=(after_time - before_time)))
         if (args.p == 2):
             print("{}\t{}\t{}\t{}\t{:.5}\t{:.5}\t{:.5}\t{}\t{}".format(
-                i, label, prediction, count, radius_gen, radius_over_sqrt_c, radius_ppf, correct, time_elapsed), file=f, flush=True)
+                i, label, prediction, count, radius_gen, radius_over_c, radius_ppf, correct, time_elapsed), file=f, flush=True)
         else:
             print("{}\t{}\t{}\t{}\t{:.5}\t{:.5}\t{}\t{}".format(
-                i, label, prediction, count, radius_gen, radius_over_sqrt_c, correct, time_elapsed), file=f, flush=True)
+                i, label, prediction, count, radius_gen, radius_over_c, correct, time_elapsed), file=f, flush=True)
 
     f.close()

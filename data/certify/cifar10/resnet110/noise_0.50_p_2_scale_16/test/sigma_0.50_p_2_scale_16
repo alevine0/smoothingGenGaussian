@@ -1,4 +1,4 @@
-idx	label	predict	count	any_iid_distribution_bound	generalized_gaussian_bound_over_sqrt(c)	exact_radius	correct	time
+idx	label	predict	count	any_iid_distribution_bound	generalized_gaussian_bound_over_c	exact_radius	correct	time
 0	3	-1	28280	0.0	0.0	0.0	0	0:00:16.406939
 20	7	-1	37594	0.0	0.0	0.0	0	0:00:16.587856
 40	4	-1	39710	0.0	0.0	0.0	0	0:00:16.593149

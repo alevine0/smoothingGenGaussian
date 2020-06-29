@@ -4,6 +4,8 @@ This repository contains code for the paper [Curse of Dimensionality on Randomiz
 
 Given a generalized gaussian shape parameter q,  we report both the generic IID distribution upper bound on the certified robustness, as well as Generalized Gaussian upper bound, for adversarial attacks with p-norm p = q. We also report the total count of base classifications for the top class.
 
+Note that the Generalized Gaussian bounds reported are reported as scaled by the constant factor of c, defined in Lemma 3. As in Theorem 2, we use the upper bound that c < 2 when reporting final bounds in the paper's figures. 
+
 Example training for 16-by-16 cifar-10 with generalized Gaussian noise for shape parameter q=3 and noise standard deviation 0.5:
 ```
 python  code/train.py cifar10 cifar_resnet110  models/cifar10/resnet110/noise_0.50_p_3_scale_16 --batch 400 --noise 0.50 --p 3 --scale_down 2
